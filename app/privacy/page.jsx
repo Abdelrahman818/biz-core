@@ -1,11 +1,21 @@
-"use client";
-
 import {
   Shield,
   Database,
   Lock,
   Eye,
 } from "lucide-react";
+
+export const metadata = {
+  title: "Privacy Policy — biz core OS",
+  description:
+    "Learn how biz core OS collects, uses, and protects your information.",
+  openGraph: {
+    title: "Privacy Policy — biz core OS",
+    description:
+      "Learn how biz core OS collects, uses, and protects your information.",
+    type: "website",
+  },
+};
 
 export default function PrivacyPage() {
   return (

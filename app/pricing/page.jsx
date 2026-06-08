@@ -1,5 +1,10 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+import { usersAPI } from "@/config";
+import toast from "react-hot-toast";
+import { useState } from "react";
 import {
   Check,
   CreditCard,
@@ -8,6 +13,59 @@ import {
 } from "lucide-react";
 
 export default function PricingPage() {
+  const router = useRouter();
+  const { user, refreshBusinessId, markPlanSelectedLocally } = useAuth();
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleSelectPlan = async (plan) => {
+    if (!user) {
+      toast.error("User not found");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setSelectedPlan(plan);
+
+      const response = await usersAPI.updatePlan(user.email, plan);
+      
+      if (!response) {
+        throw new Error("No response from server");
+      }
+
+      toast.success(`Welcome to ${plan} plan! 🎉`);
+      // Mark selected locally to avoid ProtectedRoute redirecting back to pricing
+      try { markPlanSelectedLocally(); } catch (e) { console.warn('markPlanSelectedLocally failed', e); }
+
+      // Navigate to next route immediately
+      let target = '/dashboard';
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const next = params.get('next');
+        if (next) target = next;
+      }
+      router.push(target);
+
+      // Refresh business flags in background
+      refreshBusinessId().catch((err) => console.warn('refreshBusinessId failed:', err));
+    } catch (error) {
+      console.error("Error selecting plan:", error);
+      
+      let errorMessage = "Failed to select plan";
+      if (error.message.includes("timeout")) {
+        errorMessage = "Request timed out. Please try again.";
+      } else if (error.message.includes("500")) {
+        errorMessage = "Server error. Please try again later.";
+      }
+      
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+      setSelectedPlan(null);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-background text-foreground px-6 py-12">
 
@@ -48,6 +106,9 @@ export default function PricingPage() {
               "Basic analytics",
             ]}
             button="Get Started"
+            onSelect={() => handleSelectPlan("Starter")}
+            isSelected={selectedPlan === "Starter"}
+            loading={loading && selectedPlan === "Starter"}
           />
 
           {/* PRO */}
@@ -66,6 +127,9 @@ export default function PricingPage() {
               "Real-time updates",
             ]}
             button="Start Pro"
+            onSelect={() => handleSelectPlan("Pro")}
+            isSelected={selectedPlan === "Pro"}
+            loading={loading && selectedPlan === "Pro"}
           />
 
           {/* BUSINESS */}
@@ -81,6 +145,9 @@ export default function PricingPage() {
               "Scalable infrastructure",
             ]}
             button="Contact Sales"
+            onSelect={() => handleSelectPlan("Business")}
+            isSelected={selectedPlan === "Business"}
+            loading={loading && selectedPlan === "Business"}
           />
 
         </div>
@@ -102,6 +169,9 @@ function PricingCard({
   features,
   button,
   featured,
+  onSelect,
+  isSelected,
+  loading,
 }) {
   return (
     <div
@@ -175,13 +245,15 @@ function PricingCard({
 
       {/* BUTTON */}
       <button
+        onClick={onSelect}
+        disabled={loading}
         className={`w-full rounded-2xl px-5 py-3 text-sm font-medium transition ${
           featured
-            ? "bg-blue-600 text-white hover:opacity-90"
-            : "border hover:bg-black/5 dark:hover:bg-white/5"
+            ? "bg-blue-600 text-white hover:opacity-90 disabled:opacity-50"
+            : "border hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-50"
         }`}
       >
-        {button}
+        {loading ? "Selecting..." : button}
       </button>
 
     </div>

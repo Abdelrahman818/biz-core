@@ -8,7 +8,12 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 export default function RootLayoutClient({ children }) {
   return (
     <AuthProvider>
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="system"
+        enableSystem={true}
+        enableColorScheme={false}
+      >
         <ProtectedRoute>
           <SideNav />
           {children}

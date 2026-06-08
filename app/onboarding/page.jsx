@@ -1,24 +1,54 @@
-﻿"use client";
+"use client";
 
-import { useState } from "react";
-
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-
 import toast from "react-hot-toast";
-
 import { motion, AnimatePresence } from "framer-motion";
-
 import {
   Store,
   Package,
   Sparkles,
   Globe,
 } from "lucide-react";
+import { auth } from "@/lib/firebase";
+import { useAuth } from "@/context/AuthContext";
+import { usersAPI } from "@/config";
 
-import { db, auth } from "@/lib/firebase";
-import { collection, addDoc } from "firebase/firestore";
+/* Protect onboarding: only accessible to users who haven't completed it */
+function OnboardingGuard({ children }) {
+  const { onboardingCompleted, authLoading, isAuthenticated } = useAuth();
+  const router = useRouter();
 
-/* ---------------- BACKGROUND ---------------- */
+  useEffect(() => {
+    if (authLoading) return;
+
+    // If not authenticated, let ProtectedRoute redirect to login
+    if (!isAuthenticated) return;
+
+    // Load from localStorage as fallback if onboardingCompleted is still null
+    let effective = onboardingCompleted;
+    if (effective === null && typeof window !== 'undefined') {
+      const stored = localStorage.getItem('onboarding_completed');
+      effective = stored !== null ? stored === 'true' : null;
+    }
+
+    // If onboarding is completed, auto-redirect to dashboard (no 403 page)
+    if (effective === true) {
+      router.push('/dashboard');
+    }
+  }, [authLoading, isAuthenticated, onboardingCompleted, router]);
+
+  // Show spinner while checking auth or onboarding status
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  return children;
+}
 
 function Background() {
   return (
@@ -76,8 +106,11 @@ function Background() {
 
 /* ---------------- MAIN ---------------- */
 
-export default function OnboardingPage() {
+function OnboardingPageContent() {
   const router = useRouter();
+  const { refreshBusinessId, markOnboardedLocally, setLocalBusiness } = useAuth();
+  const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+  const nextParam = searchParams.get('next');
 
   const [step, setStep] = useState(0);
 
@@ -86,10 +119,6 @@ export default function OnboardingPage() {
   const [businessType, setBusinessType] = useState("");
 
   const [currency, setCurrency] = useState("EGP");
-
-  const [productName, setProductName] = useState("");
-
-  const [productPrice, setProductPrice] = useState("");
 
   const [loading, setLoading] = useState(false);
 
@@ -134,21 +163,84 @@ export default function OnboardingPage() {
         return;
       }
 
-      // Save business info to Firestore
-      await addDoc(collection(db, "businesses"), {
-        userId: user.uid,
-        businessName,
-        businessType,
-        currency,
-        createdAt: new Date(),
-        email: user.email,
-      });
+      const businessId = `biz_${user.uid}`;
 
-      toast.success("Your Business OS is ready ðŸš€");
-      router.push("/dashboard");
+      const userData = {
+        name: businessName,
+        email: user.email,
+        business_id: businessId,
+        business_name: businessName,
+        business_type: businessType,
+        currency,
+        onboarding_completed: true,
+        pricing_selected: false,
+        role: "owner",
+        plan: "Starter",
+      };
+
+      console.log("Creating user with data:", userData);
+
+      try {
+        const response = await usersAPI.create(userData);
+        console.log("User created successfully:", response);
+
+        if (!response) {
+          throw new Error("No response from server");
+        }
+
+        toast.success("Your Business OS is ready 🚀");
+        // Navigate to pricing immediately to avoid ProtectedRoute auto-redirecting back to dashboard
+        let pricingUrl = '/pricing';
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          const next = params.get('next');
+          if (next) {
+            pricingUrl = `/pricing?next=${encodeURIComponent(next)}`;
+          }
+        }
+
+        // Set local business data so dashboard/pricing can render immediately without waiting for backend
+        try {
+          setLocalBusiness(userData);
+        } catch (e) {
+          console.warn('setLocalBusiness failed:', e);
+        }
+
+        // Mark onboarding completed locally to avoid immediate redirects
+        try {
+          markOnboardedLocally();
+        } catch (e) {
+          console.warn('markOnboardedLocally failed:', e);
+        }
+
+        // Push to pricing without refreshing business data yet
+        // ProtectedRoute will fetch fresh data when /pricing is visited
+        router.push(pricingUrl);
+      } catch (apiError) {
+        console.error("API Error during user creation:", apiError);
+        console.error("Error message:", apiError.message);
+        console.error("Full error:", apiError);
+        
+        // Provide specific error messages based on error type
+        let errorMessage = apiError.message || "Failed to complete onboarding";
+        
+        if (apiError.message.includes("500")) {
+          errorMessage = "Server error. Please try again in a moment.";
+        } else if (apiError.message.includes("400")) {
+          errorMessage = "Invalid business information. Please check and try again.";
+        } else if (apiError.message.includes("409")) {
+          errorMessage = "Business already exists for this account.";
+        } else if (apiError.message.includes("timeout") || apiError.message.includes("ECONNREFUSED")) {
+          errorMessage = "Connection error. Please check your internet and try again.";
+        } else if (apiError.message.includes("Cannot connect to API")) {
+          errorMessage = "Backend server is not running. Please contact support.";
+        }
+        
+        toast.error(errorMessage);
+      }
     } catch (error) {
-      console.error("Error saving business:", error);
-      toast.error("Failed to save business info");
+      console.error("Error during onboarding:", error);
+      toast.error("An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -205,11 +297,11 @@ export default function OnboardingPage() {
                 <Sparkles className="mx-auto mb-4 opacity-60" />
 
                 <h1 className="text-4xl font-bold mb-4">
-                  Welcome to Bizly
+                  Welcome to biz core
                 </h1>
 
                 <p className="opacity-60 mb-8">
-                  Letâ€™s build your
+                  Lets build your
                   business system in
                   minutes.
                 </p>
@@ -244,11 +336,10 @@ export default function OnboardingPage() {
                     )
                   }
                   className={`w-full mb-1 px-4 py-3 rounded-xl border bg-transparent
-                  ${
-                    errors.businessName
+                  ${errors.businessName
                       ? "border-red-500"
                       : "border-black/10 dark:border-white/10"
-                  }`}
+                    }`}
                 />
 
                 {errors.businessName && (
@@ -265,11 +356,10 @@ export default function OnboardingPage() {
                     )
                   }
                   className={`w-full mb-1 px-4 py-3 rounded-xl border bg-transparent
-                  ${
-                    errors.businessType
+                  ${errors.businessType
                       ? "border-red-500"
                       : "border-black/10 dark:border-white/10"
-                  }`}
+                    }`}
                 >
                   <option value="">
                     Select Type
@@ -329,11 +419,10 @@ export default function OnboardingPage() {
                     <button
                       key={curr}
                       onClick={() => setCurrency(curr)}
-                      className={`p-3 rounded-xl border transition ${
-                        currency === curr
-                          ? "border-blue-500 bg-blue-500/10"
-                          : "border-black/10 dark:border-white/10 hover:border-blue-500"
-                      }`}
+                      className={`p-3 rounded-xl border transition ${currency === curr
+                        ? "border-blue-500 bg-blue-500/10"
+                        : "border-black/10 dark:border-white/10 hover:border-blue-500"
+                        }`}
                     >
                       {curr}
                     </button>
@@ -389,5 +478,13 @@ export default function OnboardingPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function OnboardingPage() {
+  return (
+    <OnboardingGuard>
+      <OnboardingPageContent />
+    </OnboardingGuard>
   );
 }

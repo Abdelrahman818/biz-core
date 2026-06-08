@@ -1,11 +1,21 @@
-"use client";
-
 import {
   ShieldCheck,
   FileText,
   Lock,
   AlertTriangle,
 } from "lucide-react";
+
+export const metadata = {
+  title: "Terms & Conditions — biz core OS",
+  description:
+    "Read the terms and conditions governing your use of the biz core OS platform.",
+  openGraph: {
+    title: "Terms & Conditions — biz core OS",
+    description:
+      "Read the terms and conditions governing your use of the biz core OS platform.",
+    type: "website",
+  },
+};
 
 export default function TermsPage() {
   return (

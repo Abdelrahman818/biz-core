@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { createElement, useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import {
   Package,
@@ -17,7 +17,7 @@ import { useAuth } from "@/context/AuthContext";
 
 /* ---------------- STATUS STYLE ---------------- */
 
-const statusStyle = {
+const statusStyleMap = {
   pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/10",
   confirmed: "bg-blue-100 text-blue-700 dark:bg-blue-500/10",
   processing: "bg-purple-100 text-purple-700 dark:bg-purple-500/10",
@@ -27,13 +27,19 @@ const statusStyle = {
 
 /* ---------------- STATUS ICON ---------------- */
 
-const statusIcon = {
+const statusIconMap = {
   pending: Clock,
   confirmed: CheckCircle,
   processing: Package,
   completed: Truck,
   cancelled: XCircle,
 };
+
+const getStatusStyle = (status) =>
+  statusStyleMap[status?.toLowerCase()] || statusStyleMap.pending;
+
+const getStatusIcon = (status) =>
+  statusIconMap[status?.toLowerCase()] || Clock;
 
 /* ---------------- MAIN ---------------- */
 
@@ -101,9 +107,8 @@ export default function OrderDetailsPage() {
     );
   }
 
-  const StatusIcon = statusIcon[order.status] || Clock;
-
   const total = order.total || 0;
+  const statusIcon = getStatusIcon(order.status);
 
   return (
     <main className="min-h-screen px-6 py-10 bg-white text-black dark:bg-[#0B1220] dark:text-white">
@@ -122,9 +127,9 @@ export default function OrderDetailsPage() {
         </div>
 
         <div
-          className={`flex items-center gap-2 px-4 py-2 rounded-full ${statusStyle[order.status] || statusStyle.pending}`}
+          className={`flex items-center gap-2 px-4 py-2 rounded-full ${getStatusStyle(order.status)}`}
         >
-          <StatusIcon size={16} />
+          {createElement(statusIcon, { size: 16 })}
           {order.status}
         </div>
 

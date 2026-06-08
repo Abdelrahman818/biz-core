@@ -18,6 +18,7 @@ import {
 import {
   auth,
   googleProvider,
+  facebookProvider,
 } from "@/lib/firebase";
 
 import {
@@ -80,7 +81,7 @@ export default function LoginPage() {
           <Boxes className="text-[#3B82F6]" />
 
           <h1 className="text-2xl font-bold dark:text-white">
-            Bizly
+            biz core
           </h1>
         </div>
 
@@ -162,10 +163,29 @@ export default function LoginPage() {
 
                 router.push("/dashboard");
               } catch (error) {
-                console.log(error);
-                toast.error(
-                  "Google login failed"
-                );
+                console.error("Google login error:", error);
+                
+                if (error.code === "auth/popup-blocked") {
+                  toast.error(
+                    "Please allow popups for Google login"
+                  );
+                } else if (error.code === "auth/popup-closed-by-user") {
+                  toast.error(
+                    "Google login was cancelled"
+                  );
+                } else if (error.code === "auth/invalid-origin") {
+                  toast.error(
+                    "Domain not authorized - check Firebase Console"
+                  );
+                } else if (error.message?.includes("CORS")) {
+                  toast.error(
+                    "CORS error - check browser console (F12)"
+                  );
+                } else {
+                  toast.error(
+                    error.message || "Google login failed"
+                  );
+                }
               }
             }}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white py-3 font-medium transition hover:bg-gray-50 dark:border-[#1F2937] dark:bg-[#0F172A] dark:hover:bg-[#111827]"
@@ -179,6 +199,61 @@ export default function LoginPage() {
             />
 
             Continue with Google
+          </button>
+          
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const result =
+                  await signInWithPopup(
+                    auth,
+                    facebookProvider
+                  );
+
+                toast.success(
+                  "Welcome " +
+                    result.user.displayName
+                );
+
+                router.push("/dashboard");
+              } catch (error) {
+                console.error("Facebook login error:", error);
+                
+                if (error.code === "auth/popup-blocked") {
+                  toast.error(
+                    "Please allow popups for Facebook login"
+                  );
+                } else if (error.code === "auth/popup-closed-by-user") {
+                  toast.error(
+                    "Facebook login was cancelled"
+                  );
+                } else if (error.code === "auth/invalid-origin") {
+                  toast.error(
+                    "Domain not authorized - check Firebase Console"
+                  );
+                } else if (error.message?.includes("CORS")) {
+                  toast.error(
+                    "CORS error - check browser console (F12)"
+                  );
+                } else {
+                  toast.error(
+                    error.message || "Facebook login failed"
+                  );
+                }
+              }
+            }}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white py-3 font-medium transition hover:bg-gray-50 dark:border-[#1F2937] dark:bg-[#0F172A] dark:hover:bg-[#111827]"
+          >
+            <Image
+              src="https://www.facebook.com/favicon.ico"
+              alt="Facebook"
+              width={20}
+              height={20}
+              className="h-5 w-5"
+            />
+
+            Continue with Facebook
           </button>
         </form>
 

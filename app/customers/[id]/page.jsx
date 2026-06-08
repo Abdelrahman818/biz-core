@@ -16,13 +16,16 @@ import { useAuth } from "@/context/AuthContext";
 
 /* ---------------- STATUS STYLE ---------------- */
 
-const statusStyle = {
+const statusStyleMap = {
   pending: "text-yellow-600",
   confirmed: "text-blue-600",
   processing: "text-purple-600",
   completed: "text-green-600",
   cancelled: "text-red-600",
 };
+
+const getStatusStyle = (status) =>
+  statusStyleMap[status?.toLowerCase()] || "text-gray-600";
 
 /* ---------------- MAIN ---------------- */
 
@@ -200,9 +203,7 @@ export default function CustomerDetailsPage() {
                     </p>
 
                     <p
-                      className={`text-sm ${
-                        statusStyle[order.status]
-                      }`}
+                      className={`text-sm ${getStatusStyle(order.status)}`}
                     >
                       {order.status}
                     </p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Package,
   ShoppingCart,
@@ -12,7 +12,6 @@ import {
 
 import { useRouter } from "next/navigation";
 import { dashboardAPI } from "@/config";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useAuth } from "@/context/AuthContext";
 
 /* ---------------- MAIN ---------------- */
@@ -23,14 +22,42 @@ function DashboardContent() {
   const [stats, setStats] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const loadedBusinessIdRef = useRef(null);
+  const inFlightBusinessIdRef = useRef(null);
+  const timeoutRef = useRef(null);
 
   useEffect(() => {
+    // If no businessId, we don't set state - let ProtectedRoute redirect
+    if (!businessId) {
+      return;
+    }
+
+    if (
+      loadedBusinessIdRef.current === businessId ||
+      inFlightBusinessIdRef.current === businessId
+    ) {
+      return;
+    }
+
     const fetchDashboard = async () => {
+      inFlightBusinessIdRef.current = businessId;
+      setLoading(true);
+      setError(null);
+
+      // Set a 15-second timeout for the request
+      timeoutRef.current = setTimeout(() => {
+        setError("Dashboard data is taking too long to load. Please refresh the page.");
+        setLoading(false);
+        inFlightBusinessIdRef.current = null;
+      }, 15000);
+
       try {
-        const [overviewData, recentOrders] = await Promise.all([
-          dashboardAPI.getOverview(businessId),
-          dashboardAPI.getOrders(businessId),
-        ]);
+        const dashboardData = await dashboardAPI.getSummary(businessId, 4);
+        clearTimeout(timeoutRef.current);
+
+        const overviewData = dashboardData.overview || {};
+        const recentOrders = dashboardData.recentOrders || [];
 
         const statsData = [
           {
@@ -61,8 +88,11 @@ function DashboardContent() {
 
         setStats(statsData);
         setOrders((Array.isArray(recentOrders) ? recentOrders : recentOrders.orders || []).slice(0, 4));
+        loadedBusinessIdRef.current = businessId;
       } catch (err) {
+        clearTimeout(timeoutRef.current);
         console.error("Error fetching dashboard:", err);
+        setError(err.message || "Failed to load dashboard. Please try again.");
         setStats([
           { title: "Claimed Revenue", value: "0 EGP", icon: DollarSign, desc: "Error loading" },
           { title: "Pending Amount", value: "0 EGP", icon: Clock, desc: "Error loading" },
@@ -71,13 +101,49 @@ function DashboardContent() {
         ]);
       } finally {
         setLoading(false);
+        inFlightBusinessIdRef.current = null;
       }
     };
 
-    if (businessId) {
-      fetchDashboard();
-    }
+    fetchDashboard();
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
   }, [businessId]);
+
+  // Show loading state while fetching business data
+  if (loading && !error) {
+    return (
+      <main className="min-h-screen bg-white text-black dark:bg-[#0B1220] dark:text-white px-6 py-10 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="opacity-60">Loading your dashboard...</p>
+        </div>
+      </main>
+    );
+  }
+
+  // Show error state if something went wrong
+  if (error) {
+    return (
+      <main className="min-h-screen bg-white text-black dark:bg-[#0B1220] dark:text-white px-6 py-10">
+        <div className="max-w-md mx-auto mt-20">
+          <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-6 text-center">
+            <p className="text-red-600 font-semibold mb-4">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-2 rounded-xl bg-blue-500 text-white hover:bg-blue-600 transition"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-white text-black dark:bg-[#0B1220] dark:text-white px-6 py-10">
@@ -288,9 +354,5 @@ function DashboardContent() {
 }
 
 export default function DashboardPage() {
-  return (
-    <ProtectedRoute>
-      <DashboardContent />
-    </ProtectedRoute>
-  );
+  return <DashboardContent />;
 }

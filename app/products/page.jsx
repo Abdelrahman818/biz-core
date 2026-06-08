@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Check,
   DollarSign,
   Package,
   Pencil,
-  Plus,
   Trash2,
   X,
+  Plus
 } from "lucide-react";
 import { productsAPI } from "@/config";
 import { useAuth } from "@/context/AuthContext";
@@ -26,7 +26,7 @@ const Toast = ({ message, type = "success" }) => (
 
 export default function ProductsPage() {
   const { businessId } = useAuth();
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState({ data: [], total: 0, count: 0, skip: 0, limit: 50 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
@@ -40,25 +40,42 @@ export default function ProductsPage() {
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [editStock, setEditStock] = useState("");
+  const loadedBusinessIdRef = useRef(null);
+  const inFlightBusinessIdRef = useRef(null);
 
   useEffect(() => {
+    if (!businessId) return;
+    if (
+      loadedBusinessIdRef.current === businessId ||
+      inFlightBusinessIdRef.current === businessId
+    ) {
+      return;
+    }
+
     const fetchProducts = async () => {
+      inFlightBusinessIdRef.current = businessId;
       try {
         setLoading(true);
         setError(null);
         const data = await productsAPI.getAll(businessId);
-        setProducts(Array.isArray(data) ? data : data.products || []);
+        if (Array.isArray(data)) {
+          setProducts({ data, total: data.length, count: data.length, skip: 0, limit: data.length });
+        } else if (data && data.data) {
+          setProducts(data);
+        } else {
+          setProducts({ data: [], total: 0, count: 0, skip: 0, limit: 50 });
+        }
+        loadedBusinessIdRef.current = businessId;
       } catch (err) {
         setError("Failed to load products");
         console.error("Error fetching products:", err);
       } finally {
         setLoading(false);
+        inFlightBusinessIdRef.current = null;
       }
     };
 
-    if (businessId) {
-      fetchProducts();
-    }
+    fetchProducts();
   }, [businessId]);
 
   const showToast = (message, type = "success") => {
@@ -83,11 +100,12 @@ export default function ProductsPage() {
           name: name.trim(),
           price: Number(price),
           stock: Number(stock),
+          business_id: businessId
         },
         businessId
       );
 
-      setProducts([newProduct, ...products]);
+      setProducts(prev => ({ ...prev, data: [newProduct, ...(prev.data || [])], total: (prev.total || 0) + 1, count: (prev.count || 0) + 1 }));
       setName("");
       setPrice("");
       setStock("");
@@ -101,7 +119,7 @@ export default function ProductsPage() {
   const deleteProduct = async (id) => {
     try {
       await productsAPI.delete(id, businessId);
-      setProducts(products.filter((product) => product.id !== id));
+      setProducts(prev => ({ ...prev, data: prev.data.filter((product) => product.id !== id), total: Math.max(0, (prev.total || 0) - 1), count: Math.max(0, (prev.count || 0) - 1) }));
       showToast("Product deleted");
     } catch (err) {
       showToast("Failed to delete product", "error");
@@ -133,22 +151,12 @@ export default function ProductsPage() {
           name: editName.trim(),
           price: Number(editPrice),
           stock: Number(editStock),
+          business_id: businessId
         },
         businessId
       );
 
-      setProducts(
-        products.map((product) =>
-          product.id === editingId
-            ? {
-                ...product,
-                name: editName.trim(),
-                price: Number(editPrice),
-                stock: Number(editStock),
-              }
-            : product
-        )
-      );
+      setProducts(prev => ({ ...prev, data: prev.data.map((product) => product.id === editingId ? { ...product, name: editName.trim(), price: Number(editPrice), stock: Number(editStock) } : product) }));
 
       showToast("Product updated");
       cancelEdit();
@@ -158,9 +166,7 @@ export default function ProductsPage() {
     }
   };
 
-  const filtered = products.filter((product) =>
-    product.name?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = (products.data || []).filter((product) => product.name?.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-white to-gray-100 px-6 py-10 text-black dark:from-[#0B1220] dark:to-[#0F172A] dark:text-white">
@@ -177,13 +183,6 @@ export default function ProductsPage() {
           </p>
         </div>
 
-        <Link
-          href="/products/new"
-          className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-medium text-white"
-        >
-          <Plus size={16} />
-          New Product
-        </Link>
       </div>
 
       {error && (
@@ -252,7 +251,7 @@ export default function ProductsPage() {
             )}
 
             <div className="space-y-4">
-              {filtered.map((product) => (
+              {filtered.slice().reverse().map((product) => (
                 <div
                   key={product.id}
                   className="flex items-center justify-between rounded-2xl border bg-white p-5 dark:bg-white/5"

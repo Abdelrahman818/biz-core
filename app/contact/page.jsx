@@ -90,7 +90,7 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <p className="text-xs opacity-50 font-medium">Email</p>
-                    <p className="text-sm font-semibold">support@bizly.com</p>
+                    <p className="text-sm font-semibold">cs@biz-core.com</p>
                   </div>
                 </div>
 
@@ -100,7 +100,7 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <p className="text-xs opacity-50 font-medium">Phone</p>
-                    <p className="text-sm font-semibold">+20 100 000 0000</p>
+                    <p className="text-sm font-semibold">+20 110 0240 856</p>
                   </div>
                 </div>
 
@@ -117,7 +117,7 @@ export default function ContactPage() {
             </div>
 
             <div className="pt-6 border-t border-black/10 dark:border-white/10 text-xs opacity-50">
-              © {new Date().getFullYear()} Bizly Inc. All rights reserved.
+              © {new Date().getFullYear()} biz core Inc. All rights reserved.
             </div>
           </div>
 

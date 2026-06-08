@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { useAuth } from "@/context/AuthContext";
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -76,9 +77,8 @@ const NAV_LINKS = [
 export default function SideNav() {
   const router   = useRouter();
   const pathname = usePathname();
+  const { user, loading: authLoading } = useAuth();
 
-  const [user,        setUser]        = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
   const [hovered,     setHovered]     = useState(false);
   const initialOpenGroups = Object.fromEntries(
     NAV_LINKS.filter((link) =>
@@ -86,15 +86,6 @@ export default function SideNav() {
     ).map((link) => [link.label, true])
   );
   const [openGroups,  setOpenGroups]  = useState(initialOpenGroups);
-
-  // Firebase auth listener
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setAuthLoading(false);
-    });
-    return () => unsub();
-  }, []);
 
   // Sync body padding-left with hover state
   useEffect(() => {
@@ -153,7 +144,7 @@ export default function SideNav() {
           }}
           className="whitespace-nowrap text-lg font-bold tracking-tight"
         >
-          Bizly
+          BIZ CORE
         </span>
       </div>
 

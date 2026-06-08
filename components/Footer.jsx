@@ -12,7 +12,7 @@ const Footer = () => {
           {/* BRAND */}
           <div>
             <h2 className="text-xl font-bold text-[#111827] dark:text-white">
-              Bizly
+              BIZ CORE
             </h2>
 
             <p className="mt-3 text-sm text-[#6B7280] dark:text-[#9CA3AF] leading-6">
@@ -61,7 +61,7 @@ const Footer = () => {
             </h3>
 
             <ul className="space-y-2 text-sm text-[#6B7280] dark:text-[#9CA3AF]">
-              <li>support@bizly.com</li>
+              <li>support@biz-core.com</li>
               <li>+20 100 000 0000</li>
               <li>Cairo, Egypt</li>
             </ul>
@@ -73,7 +73,7 @@ const Footer = () => {
         <div className="mt-10 border-t border-[#E5E7EB] dark:border-[#1F2937] pt-6 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-[#6B7280] dark:text-[#9CA3AF]">
 
           <div>
-            © {new Date().getFullYear()} Bizly. All rights reserved.
+            © {new Date().getFullYear()} BIZ CORE. All rights reserved.
           </div>
 
           <div className="text-center md:text-right">

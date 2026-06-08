@@ -10,12 +10,11 @@ import {
 } from "lucide-react";
 
 import {
-  createUserWithEmailAndPassword,
   updateProfile,
   signInWithPopup,
 } from "firebase/auth";
 
-import { auth, googleProvider } from "@/lib/firebase";
+import { auth, googleProvider, facebookProvider } from "@/lib/firebase";
 
 import { useAuth } from "@/context/AuthContext";
 
@@ -38,6 +37,9 @@ export default function SignupPage() {
     useState(false);
 
   const [googleLoading, setGoogleLoading] =
+    useState(false);
+
+  const [facebookLoading, setFacebookLoading] =
     useState(false);
 
   /* ---------------- SIGNUP ---------------- */
@@ -64,6 +66,18 @@ export default function SignupPage() {
       });
 
       toast.success("Account created successfully");
+
+      // Wait for Firebase auth state to settle so AuthContext sees the new user
+      await new Promise((resolve) => {
+        const start = Date.now();
+        const check = () => {
+          if (auth.currentUser) return resolve();
+          if (Date.now() - start > 5000) return resolve();
+          setTimeout(check, 100);
+        };
+        check();
+      });
+
       router.replace("/onboarding");
     } catch (error) {
       console.log(error);
@@ -84,32 +98,93 @@ export default function SignupPage() {
 
   /* ---------------- GOOGLE LOGIN ---------------- */
 
-  const handleGoogleLogin =
-    async () => {
-      try {
-        setGoogleLoading(true);
+  const handleGoogleLogin = async () => {
+    try {
+      setGoogleLoading(true);
 
-        const result =
-          await signInWithPopup(
-            auth,
-            googleProvider
-          );
+      const result = await signInWithPopup(
+        auth,
+        googleProvider
+      );
 
-        toast.success(
-          `Welcome ${result.user.displayName}`
-        );
+      toast.success(
+        `Welcome ${result.user.displayName}`
+      );
 
-        router.push("/onboarding");
-      } catch (error) {
-        console.log(error);
+      router.push("/onboarding");
+    } catch (error) {
+      console.error("Google signup error:", error);
 
+      if (error.code === "auth/popup-blocked") {
         toast.error(
-          "Google login failed"
+          "Please allow popups for Google login"
         );
-      } finally {
-        setGoogleLoading(false);
+      } else if (error.code === "auth/popup-closed-by-user") {
+        toast.error(
+          "Google login was cancelled"
+        );
+      } else if (error.code === "auth/invalid-origin") {
+        toast.error(
+          "Domain not authorized - check Firebase Console"
+        );
+      } else if (error.message?.includes("CORS")) {
+        toast.error(
+          "CORS error - check browser console (F12)"
+        );
+      } else {
+        toast.error(
+          error.message || "Google signup failed"
+        );
       }
-    };
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  /* ---------------- FACEBOOK LOGIN ---------------- */
+
+  const handleFacebookLogin = async () => {
+    try {
+      setFacebookLoading(true);
+
+      const result = await signInWithPopup(
+        auth,
+        facebookProvider
+      );
+
+      toast.success(
+        `Welcome ${result.user.displayName}`
+      );
+
+      router.push("/onboarding");
+    } catch (error) {
+      console.error("Facebook signup error:", error);
+
+      if (error.code === "auth/popup-blocked") {
+        toast.error(
+          "Please allow popups for Facebook login"
+        );
+      } else if (error.code === "auth/popup-closed-by-user") {
+        toast.error(
+          "Facebook login was cancelled"
+        );
+      } else if (error.code === "auth/invalid-origin") {
+        toast.error(
+          "Domain not authorized - check Firebase Console"
+        );
+      } else if (error.message?.includes("CORS")) {
+        toast.error(
+          "CORS error - check browser console (F12)"
+        );
+      } else {
+        toast.error(
+          error.message || "Facebook signup failed"
+        );
+      }
+    } finally {
+      setFacebookLoading(false);
+    }
+  };
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#F9FAFB] px-6 dark:bg-[#0F172A]">
@@ -123,7 +198,7 @@ export default function SignupPage() {
 
           <div>
             <h1 className="text-2xl font-bold dark:text-white">
-              Bizly
+              biz core
             </h1>
 
             <p className="text-sm text-[#6B7280] dark:text-[#9CA3AF]">
@@ -254,6 +329,29 @@ export default function SignupPage() {
             {googleLoading
               ? "Connecting..."
               : "Continue with Google"}
+          </button>
+
+          {/* FACEBOOK LOGIN */}
+          <button
+            type="button"
+            onClick={
+              handleFacebookLogin
+            }
+            disabled={
+              facebookLoading
+            }
+            className="flex w-full items-center justify-center gap-3 rounded-2xl border border-[#E5E7EB] bg-white py-3 font-medium transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#1F2937] dark:bg-[#0F172A] dark:text-white dark:hover:bg-[#111827]"
+          >
+            <Image
+              src="https://www.facebook.com/favicon.ico"
+              alt="Facebook"
+              width={20}
+              height={20}
+            />
+
+            {facebookLoading
+              ? "Connecting..."
+              : "Continue with Facebook"}
           </button>
         </form>
 

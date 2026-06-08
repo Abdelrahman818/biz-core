@@ -16,7 +16,7 @@ import { useAuth } from "@/context/AuthContext";
 
 export default function CustomersPage() {
   const { businessId } = useAuth();
-  const [customers, setCustomers] = useState([]);
+  const [customers, setCustomers] = useState({ data: [], total: 0, count: 0, skip: 0, limit: 50 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
@@ -27,7 +27,13 @@ export default function CustomersPage() {
         setLoading(true);
         setError(null);
         const data = await customersAPI.getAll(businessId);
-        setCustomers(Array.isArray(data) ? data : data.customers || []);
+        if (Array.isArray(data)) {
+          setCustomers({ data, total: data.length, count: data.length, skip: 0, limit: data.length });
+        } else if (data && data.data) {
+          setCustomers(data);
+        } else {
+          setCustomers({ data: [], total: 0, count: 0, skip: 0, limit: 50 });
+        }
       } catch (err) {
         setError("Failed to load customers");
         console.error("Error fetching customers:", err);
@@ -41,7 +47,7 @@ export default function CustomersPage() {
     }
   }, [businessId]);
 
-  const filtered = customers.filter(
+  const filtered = (customers.data || []).filter(
     (c) =>
       (c.name?.toLowerCase() || "").includes(search.toLowerCase())
   );

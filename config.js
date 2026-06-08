@@ -29,6 +29,8 @@ export const API_ENDPOINTS = {
     BASE: `${API_BASE_URL}/api/users`,
     CREATE: `${API_BASE_URL}/api/users`,
     GET_ALL: `${API_BASE_URL}/api/users`,
+    GET_BY_EMAIL: (email) => `${API_BASE_URL}/api/users/by-email/${encodeURIComponent(email)}`,
+    UPDATE_PLAN: (email) => `${API_BASE_URL}/api/users/by-email/${encodeURIComponent(email)}/plan`,
     GET_BY_ID: (id) => `${API_BASE_URL}/api/users/${id}`,
     UPDATE_ROLE: (id) => `${API_BASE_URL}/api/users/${id}/role`,
     DELETE: (id) => `${API_BASE_URL}/api/users/${id}`,
@@ -68,10 +70,11 @@ export const API_ENDPOINTS = {
 
   // Dashboard/Analytics endpoints
   DASHBOARD: {
+    SUMMARY: `${API_BASE_URL}/api/dashboard/summary`,
     OVERVIEW: `${API_BASE_URL}/api/dashboard/overview`,
     SALES: `${API_BASE_URL}/api/dashboard/sales`,
     PROFIT: `${API_BASE_URL}/api/dashboard/profit`,
-    ORDERS: `${API_BASE_URL}/api/dashboard/orders/6`
+    ORDERS: (limit = 6) => `${API_BASE_URL}/api/dashboard/orders/${limit}`
   },
 };
 
@@ -82,30 +85,66 @@ export const API_ENDPOINTS = {
 
 export const apiCall = async (url, options = {}) => {
   try {
+    const { skipAuth = false, timeout = 15000, ...fetchOptions } = options;
     const user = auth.currentUser;
-    const token = user ? await user.getIdToken() : null;
+    let token = null;
+    if (!skipAuth && user) {
+      // Avoid hanging if Firebase token retrieval stalls — timeout after 3s
+      try {
+        token = await Promise.race([
+          user.getIdToken(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Token timeout')), 3000)),
+        ]).catch(() => null);
+      } catch (e) {
+        console.warn('Token retrieval failed or timed out:', e);
+        token = null;
+      }
+    }
 
     const headers = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...fetchOptions.headers,
     };
 
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
 
-    const response = await fetch(url, {
-      headers,
-      ...options,
-    });
+    // Create an abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `API Error: ${response.status} ${response.statusText}`);
+    try {
+      const response = await fetch(url, {
+        headers,
+        signal: controller.signal,
+        ...fetchOptions,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.detail || errorData.message || `API Error: ${response.status} ${response.statusText}`;
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout: API is taking too long to respond');
+      }
+      
+      // Handle network errors with better message
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        throw new Error(`Cannot connect to API (${new URL(url).hostname}:${new URL(url).port || 'default'}). Make sure the backend server is running.`);
+      }
+      
+      throw error;
     }
-
-    const data = await response.json();
-    return data;
   } catch (error) {
     console.error('API Call Error:', error);
     throw error;
@@ -172,9 +211,10 @@ export const productsAPI = {
   },
 
   create: async (productData, businessId) => {
-    return apiCall(API_ENDPOINTS.PRODUCTS.CREATE, {
+    const url = addBusinessIdToUrl(API_ENDPOINTS.PRODUCTS.CREATE, businessId);
+    return apiCall(url, {
       method: 'POST',
-      body: JSON.stringify({ ...productData, business_id: businessId }),
+      body: JSON.stringify(productData),
     });
   },
 
@@ -243,26 +283,63 @@ export const customersAPI = {
  * Dashboard API Methods
  */
 export const dashboardAPI = {
+  getSummary: async (businessId, limit = 4) => {
+    let url = `${API_ENDPOINTS.DASHBOARD.SUMMARY}?limit=${limit}`;
+    url = addBusinessIdToUrl(url, businessId);
+    return apiCall(url, { skipAuth: true });
+  },
+
   getOverview: async (businessId) => {
     const url = addBusinessIdToUrl(API_ENDPOINTS.DASHBOARD.OVERVIEW, businessId);
-    return apiCall(url);
+    return apiCall(url, { skipAuth: true });
   },
 
   getSales: async (range = 'weekly', businessId) => {
     let url = `${API_ENDPOINTS.DASHBOARD.SALES}?range=${range}`;
     url = addBusinessIdToUrl(url, businessId);
-    return apiCall(url);
+    return apiCall(url, { skipAuth: true });
   },
 
   getProfit: async (businessId) => {
     const url = addBusinessIdToUrl(API_ENDPOINTS.DASHBOARD.PROFIT, businessId);
-    return apiCall(url);
+    return apiCall(url, { skipAuth: true });
   },
 
-  getOrders: async (businessId) => {
-    const url = addBusinessIdToUrl(API_ENDPOINTS.DASHBOARD.ORDERS, businessId);
-    return apiCall(url);
+  getOrders: async (businessId, limit = 6) => {
+    const url = addBusinessIdToUrl(API_ENDPOINTS.DASHBOARD.ORDERS(limit), businessId);
+    return apiCall(url, { skipAuth: true });
   }
 };
+
+/**
+ * Users API Methods
+ */
+export const usersAPI = {
+  /**
+   * Create a user record on your own API during onboarding.
+   * business_id is sent inside the request body (not as a query param).
+   */
+  create: async (userData) => {
+    return apiCall(API_ENDPOINTS.USERS.CREATE, {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+  },
+
+  getByEmail: async (email) => {
+    return apiCall(API_ENDPOINTS.USERS.GET_BY_EMAIL(email), { skipAuth: true });
+  },
+
+  updatePlan: async (email, plan) => {
+    return apiCall(API_ENDPOINTS.USERS.UPDATE_PLAN(email), {
+      method: 'PATCH',
+      body: JSON.stringify({ plan }),
+    });
+  },
+
+  getAll: async () => {
+    return apiCall(API_ENDPOINTS.USERS.GET_ALL);
+  }
+}
 
 export default API_ENDPOINTS;

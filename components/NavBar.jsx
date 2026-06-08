@@ -13,7 +13,7 @@ const NavBar = () => {
         {/* LOGO */}
         <div className="flex items-center gap-2">
           <Boxes className="text-[#3B82F6]" />
-          <h1 className="text-xl font-bold">Bizly</h1>
+          <h1 className="text-xl font-bold">BIZ CORE</h1>
         </div>
 
         {/* ACTIONS */}

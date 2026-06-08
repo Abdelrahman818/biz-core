@@ -1,23 +1,12 @@
 import ToastProvider from "@/components/Providers/ToastProvider";
 import RootLayoutClient from "@/components/Layouts/RootLayoutClient";
-import { Geist, Geist_Mono } from "next/font/google";
 import "@/styles/globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   title: {
-    default: "Bizly - Small Business Operating System",
-    template: "%s | Bizly",
+    default: "biz core - Small Business Operating System",
+    template: "%s | biz core",
   },
   description:
     "Manage small business products, customers, orders, inventory, and analytics from one operating system.",
@@ -28,18 +17,18 @@ export const metadata = {
     "customer management",
     "business analytics",
   ],
-  applicationName: "Bizly",
+  applicationName: "biz core",
   openGraph: {
-    title: "Bizly - Small Business Operating System",
+    title: "biz core - Small Business Operating System",
     description:
       "Manage products, customers, orders, inventory, and analytics from one place.",
     url: "/",
-    siteName: "Bizly",
+    siteName: "biz core",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Bizly - Small Business Operating System",
+    title: "biz core - Small Business Operating System",
     description:
       "Manage products, customers, orders, inventory, and analytics from one place.",
   },
@@ -49,11 +38,30 @@ export default function RootLayout({ children }) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+      className="h-full antialiased"
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (isDark) {
+                  document.documentElement.classList.add('dark');
+                } else {
+                  document.documentElement.classList.remove('dark');
+                }
+              } catch (e) {}
+            `,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">
-        <ToastProvider />
-        <RootLayoutClient>{children}</RootLayoutClient>
+        <>
+          <ToastProvider />
+          <RootLayoutClient>{children}</RootLayoutClient>
+        </>
       </body>
     </html>
   );

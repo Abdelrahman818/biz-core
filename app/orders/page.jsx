@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+
 import {
   Package,
   Truck,
@@ -12,7 +14,7 @@ import {
 import { ordersAPI } from "@/config";
 import { useAuth } from "@/context/AuthContext";
 
-const statusStyle = {
+const statusStyleMap = {
   pending:
     "text-yellow-600 bg-yellow-100 dark:bg-yellow-500/10",
   confirmed:
@@ -25,7 +27,7 @@ const statusStyle = {
     "text-red-600 bg-red-100 dark:bg-red-500/10",
 };
 
-const statusIcon = {
+const statusIconMap = {
   pending: Clock,
   confirmed: CheckCircle,
   processing: Package,
@@ -33,7 +35,14 @@ const statusIcon = {
   cancelled: XCircle,
 };
 
+const getStatusStyle = (status) =>
+  statusStyleMap[status?.toLowerCase()] || statusStyleMap.pending;
+
+const getStatusIcon = (status) =>
+  statusIconMap[status?.toLowerCase()] || Clock;
+
 export default function OrdersPage() {
+
   const { businessId } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -77,6 +86,9 @@ export default function OrdersPage() {
 }
 
 function OrdersPageContent({ orders, loading, error, search, setSearch }) {
+  
+  const router = useRouter();
+
     return (
     <main className="min-h-screen px-6 py-10 bg-white text-black dark:bg-[#0B1220] dark:text-white">
 
@@ -139,11 +151,11 @@ function OrdersPageContent({ orders, loading, error, search, setSearch }) {
         <div className="space-y-4">
 
           {orders.map((order) => {
-            const StatusIcon =
-              statusIcon[order.status] || Clock;
+            const StatusIcon = getStatusIcon(order.status);
 
             return (
               <div
+                onClick={() => router.push(`/orders/${order.id}`)}
                 key={order.id}
                 className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-black/10 dark:border-white/10 p-5"
               >
@@ -181,9 +193,7 @@ function OrdersPageContent({ orders, loading, error, search, setSearch }) {
                   </div>
 
                   <div
-                    className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
-                      statusStyle[order.status] || statusStyle.pending
-                    }`}
+                    className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${getStatusStyle(order.status)}`}
                   >
                     {StatusIcon && <StatusIcon size={14} />}
                     {order.status}
